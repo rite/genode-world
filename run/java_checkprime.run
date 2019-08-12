@@ -1,0 +1,96 @@
+create_boot_directory
+
+import_from_depot [depot_user]/pkg/jdk \
+                  [depot_user]/src/init \
+                  [depot_user]/src/report_rom \
+                  [depot_user]/src/[base_src] \
+
+# build and bundle the java application
+exec javac -d [run_dir] [genode_dir]/repos/world/run/java_checkprime/checkprime.java
+exec jar cfe [run_dir]/genode/app.jar CheckPrime -C [run_dir] CheckPrime.class
+exec tar -cf [run_dir]/genode/app.tar -C [run_dir]/genode app.jar
+
+set config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="LOG"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="PD"/>
+		<service name="IRQ"/>
+		<service name="IO_PORT"/>
+		<service name="IO_MEM"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<default caps="100" />
+	<start name="timer">
+		<resource name="RAM" quantum="2M" />
+		<provides> <service name="Timer" /> </provides>
+	</start>
+	<start name="java" caps="300">
+		<resource name="RAM" quantum="96M" />
+		<route>
+			<service name="ROM" label="zip.lib.so">
+				<parent label="jzip.lib.so" />
+			</service>
+			<service name="ROM" label="net.lib.so">
+				<parent label="jnet.lib.so" />
+			</service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+		<config ld_verbose="no">
+			<arg value="/bin/java" />
+			<arg value="-XX:+NeverActAsServerClassMachine"/>
+			<arg value="-XX:+UnlockDiagnosticVMOptions"/>
+			<arg value="-XX:-ImplicitNullChecks"/>
+			<!-- <arg value="-XX:+CITime" /> -->
+			<!-- <arg value="-Xcomp"/> -->
+			<!-- <arg value="-XX:+PrintCompilation" /> -->
+			<arg value="-jar" />
+			<arg value="app.jar" />
+			<libc stdin="/numbers.dat" stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc" />
+			<vfs rtc="/dev/rtc">
+				<dir name="dev">
+					<log/><null/><inline name="rtc">2000-01-01 00:00</inline>
+				</dir>
+				<inline name="numbers.dat">17 6,700,417 2,147,483,648
+43 1234567
+</inline>
+				<dir name="bin">
+					<rom name="java" />
+				</dir>
+				<dir name="lib">
+					<rom name="java.lib.so" />
+					<inline name="jvm.cfg">-server KNOWN
+-client IGNORE
+</inline>
+					<dir name="server">
+						<rom name="jvm.lib.so" />
+					</dir>
+				</dir>
+				<dir name="modules">
+					<tar name="classes.tar" />
+				</dir>
+				<rom name="app.jar" />
+				<!-- <tar name="app.tar" /> -->
+				<rom name="zip.lib.so" />
+				<rom name="nio.lib.so" />
+				<rom name="net.lib.so" />
+			</vfs>
+		</config>
+	</start>
+</config>
+}
+
+install_config $config
+
+build_boot_image { }
+
+append qemu_args " -nographic -serial mon:stdio "
+
+run_genode_until "child \"java\" exited with exit value 0" 60
+
+# vi: set ft=tcl :
