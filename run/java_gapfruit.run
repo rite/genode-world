@@ -43,58 +43,100 @@ set config {
 		<provides> <service name="Timer" /> </provides>
 	</start>
 
-	<start name="java" caps="500">
-		<resource name="RAM" quantum="96M" />
-		<route>
-			<service name="ROM" label="zip.lib.so">
-				<parent label="jzip.lib.so" />
-			</service>
-			<service name="ROM" label="net.lib.so">
-				<parent label="jnet.lib.so" />
-			</service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
-		<config ld_verbose="no">
-			<arg value="/bin/java" />
-			<arg value="-XX:+NeverActAsServerClassMachine"/>
-			<arg value="-XX:+UnlockDiagnosticVMOptions"/>
-			<arg value="-XX:-ImplicitNullChecks"/>
-			<arg value="-XX:+CITime" />
-			<!-- <arg value="-Xcomp"/> -->
-			<!-- <arg value="-XX:+PrintCompilation" /> -->
-			<!-- <arg value="-verbose"/> -->
-			<!-- <arg value="-Xlog:logging=debug"/> -->
-			<arg value="-jar" />
-			<arg value="tee_test.jar" />
-			<libc stdin="/dev/stdin" stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc" />
-			<vfs rtc="/dev/rtc">
-				<dir name="dev">
-					<log/><null/><inline name="rtc">2000-01-01 00:00</inline>
-					<inline name="stdin">Hello World!</inline>
-				</dir>
-				<dir name="bin">
-					<rom name="java" />
-				</dir>
-				<dir name="lib">
-					<rom name="java.lib.so" />
-					<inline name="jvm.cfg">-server KNOWN
+	<start name="stage1" caps="65536">
+		<binary name="init"/>
+		<resource name="RAM" quantum="2G" />
+		<config>
+			<parent-provides>
+				<service name="CPU"/>
+				<service name="LOG"/>
+				<service name="PD"/>
+				<service name="ROM"/>
+				<service name="Timer"/>
+			</parent-provides>
+
+			<default-route>
+				<any-service> <parent/> <any-child/> </any-service>
+			</default-route>
+		
+			<default caps="100" />
+
+			<start name="tee" caps="65536">
+				<binary name="init"/>
+				<resource name="RAM" quantum="2G" />
+				<config>
+					<parent-provides>
+						<service name="CPU"/>
+						<service name="LOG"/>
+						<service name="PD"/>
+						<service name="ROM"/>
+						<service name="Timer"/>
+					</parent-provides>
+
+					<default-route>
+						<any-service> <parent/> <any-child/> </any-service>
+					</default-route>
+				
+					<default caps="100" />
+
+					<start name="java" caps="500"> <resource name="RAM" quantum="96M" />
+						<route>
+							<service name="ROM" label="zip.lib.so">
+								<parent label="jzip.lib.so" />
+							</service>
+							<service name="ROM" label="net.lib.so">
+								<parent label="jnet.lib.so" />
+							</service>
+							<any-service> <parent/> <any-child/> </any-service>
+						</route>
+						<config ld_verbose="no">
+							<arg value="/bin/java" />
+							<arg value="-XX:+NeverActAsServerClassMachine"/>
+							<arg value="-XX:+UnlockDiagnosticVMOptions"/>
+							<arg value="-XX:-ImplicitNullChecks"/>
+							<arg value="-XX:+CITime" />
+							<!-- <arg value="-Xcomp"/> -->
+							<!-- <arg value="-XX:+PrintCompilation" /> -->
+							<!-- <arg value="-verbose"/> -->
+							<!-- <arg value="-Xlog:logging=debug"/> -->
+							<arg value="-jar" />
+							<arg value="tee_test.jar" />
+							<libc stdin="/dev/stdin" stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc" />
+							<vfs rtc="/dev/rtc">
+								<dir name="dev">
+									<log/><null/><inline name="rtc">2000-01-01 00:00</inline>
+									<inline name="stdin">Hello World!</inline>
+								</dir>
+								<dir name="bin">
+									<rom name="java" />
+								</dir>
+								<dir name="lib">
+									<rom name="java.lib.so" />
+									<inline name="jvm.cfg">-server KNOWN
 -client IGNORE
 </inline>
-					<dir name="server">
-						<rom name="jvm.lib.so" />
-					</dir>
-				</dir>
-				<dir name="modules">
-					<tar name="classes.tar" />
-				</dir>
-				<!-- <tar name="hello.tar" /> -->
-				<tar name="tee_test.tar" />
-				<rom name="zip.lib.so" />
-				<rom name="nio.lib.so" />
-				<rom name="net.lib.so" />
-			</vfs>
+									<dir name="server">
+										<rom name="jvm.lib.so" />
+									</dir>
+								</dir>
+								<dir name="modules">
+									<tar name="classes.tar" />
+								</dir>
+								<!-- <tar name="hello.tar" /> -->
+								<tar name="tee_test.tar" />
+								<rom name="zip.lib.so" />
+								<rom name="nio.lib.so" />
+								<rom name="net.lib.so" />
+							</vfs>
+						</config>
+					</start>
+
+				</config>
+			</start>
+
 		</config>
 	</start>
+
 
 </config>
 }
