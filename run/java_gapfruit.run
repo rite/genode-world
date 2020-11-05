@@ -16,7 +16,12 @@ set build_components {
 build $build_components
 create_boot_directory
 
-import_from_depot [depot_user]/pkg/jdk
+lappend depot_archives [depot_user]/pkg/jdk
+lappend depot_archives [depot_user]/src/chroot
+lappend depot_archives [depot_user]/src/fs_rom
+lappend depot_archives [depot_user]/src/lx_fs
+
+import_from_depot $depot_archives
 
 set config {
 <config>
@@ -32,20 +37,45 @@ set config {
 		<service name="IO_MEM"/>
 	</parent-provides>
 
-	<default-route>
-		<any-service> <parent/> <any-child/> </any-service>
-	</default-route>
-
-	<default caps="100" />
-
-	<start name="timer">
+	<start name="timer" caps="100">
 		<resource name="RAM" quantum="2M" />
 		<provides> <service name="Timer" /> </provides>
+		<route>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+	<start name="lx_fs" caps="220" ld="no">
+		<resource name="RAM" quantum="8M"/>
+		<provides> <service name="File_system"/> </provides>
+		<route>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+		<config>
+			<policy label="vfs -> " root="/" writeable="no"/>
+		</config>
+	</start>
+
+	<start name="vfs" caps="150">
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="File_system"/> </provides>
+		<route>
+			<service name="File_system"> <child name="lx_fs"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+		<config>
+			<vfs> <fs/> </vfs>
+			<default-policy root="/" writeable="no"/>
+		</config>
 	</start>
 
 	<start name="stage1" caps="65536">
 		<binary name="init"/>
-		<resource name="RAM" quantum="2G" />
+		<resource name="RAM" quantum="2G"/>
+		<route>
+			<service name="File_system"> <child name="vfs"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
 		<config>
 			<parent-provides>
 				<service name="CPU"/>
@@ -53,17 +83,27 @@ set config {
 				<service name="PD"/>
 				<service name="ROM"/>
 				<service name="Timer"/>
+				<service name="File_system"/>
 			</parent-provides>
 
-			<default-route>
-				<any-service> <parent/> <any-child/> </any-service>
-			</default-route>
-		
-			<default caps="100" />
+			<start name="chroot" caps="60">
+				<resource name="RAM" quantum="2M"/>
+				<provides> <service name="File_system"/> </provides>
+				<route>
+					<service name="File_system"> <parent/> </service>
+					<any-service> <parent/> <any-child/> </any-service>
+				</route>
+				<config>
+					<default-policy writeable="no"/>
+				</config>
+			</start>
 
 			<start name="tee" caps="65536">
 				<binary name="init"/>
 				<resource name="RAM" quantum="2G" />
+				<route>
+					<any-service> <parent/> <any-child/> </any-service>
+				</route>
 				<config>
 					<parent-provides>
 						<service name="CPU"/>
@@ -71,21 +111,32 @@ set config {
 						<service name="PD"/>
 						<service name="ROM"/>
 						<service name="Timer"/>
+						<service name="File_system"/>
 					</parent-provides>
 
-					<default-route>
-						<any-service> <parent/> <any-child/> </any-service>
-					</default-route>
-				
-					<default caps="100" />
+					<start name="fs_rom" caps="100">
+						<resource name="RAM" quantum="2M"/>
+						<provides> <service name="ROM"/> </provides>
+						<route>
+							<service name="File_system"> <parent label="chroot"/> </service>
+							<any-service> <parent/> <any-child/> </any-service>
+						</route>
+						<config>
+							<vfs> <fs/> </vfs>
+						</config>
+					</start>
 
-					<start name="java" caps="500"> <resource name="RAM" quantum="96M" />
+					<start name="java" caps="500">
+						<resource name="RAM" quantum="96M" />
 						<route>
 							<service name="ROM" label="zip.lib.so">
 								<parent label="jzip.lib.so" />
 							</service>
 							<service name="ROM" label="net.lib.so">
 								<parent label="jnet.lib.so" />
+							</service>
+							<service name="ROM" label="tee_test.tar">
+								<child name="fs_rom"/>
 							</service>
 							<any-service> <parent/> <any-child/> </any-service>
 						</route>
