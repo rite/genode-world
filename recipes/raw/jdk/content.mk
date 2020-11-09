@@ -9,4 +9,4 @@ hello.tar:
 	cp $(GENERATED_DIR)/$@ $@
 
 classes.tar:
-	cp $(GENERATED_DIR)/$@ $@
+	cp $(REP_DIR)/run/$@ $@
